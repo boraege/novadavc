@@ -221,12 +221,27 @@ function addVideoStream(id, stream, label) {
   video.playsInline = true;
   
   // Kendi sesimizi duymamak için local video her zaman muted
-  if (id === 'local') {
+  if (id === 'local' || id === 'local-screen') {
     video.muted = true;
   } else {
     // Diğer kullanıcıların sesi için yankı önleme
     video.volume = 1.0;
   }
+  
+  // Mobilde dokunma ile pause olmasını engelle
+  video.addEventListener('pause', () => {
+    video.play().catch(err => console.log('Video play hatası:', err));
+  });
+  
+  // Dokunma olaylarını engelle
+  video.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  
+  video.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+  });
   
   const labelDiv = document.createElement('div');
   labelDiv.className = 'video-label';
