@@ -90,7 +90,11 @@ socket.on('user-disconnected', (userId) => {
     peers[userId].close();
     delete peers[userId];
   }
-  removeVideoStream(userId);
+  
+  // Bu kullanıcıya ait tüm video stream'leri kaldır
+  const videoContainers = document.querySelectorAll(`[id^="video-${userId}-"]`);
+  videoContainers.forEach(container => container.remove());
+  
   updateUsersList();
 });
 
@@ -149,10 +153,20 @@ async function createPeerConnection(userId, isInitiator, userName) {
   peers[userId] = peer;
   
   peer.ontrack = (event) => {
-    console.log('Track alındı:', event.track.kind, 'from', userId);
-    addVideoStream(userId, event.streams[0], userName);
+    console.log('Track alındı:', event.track.kind, 'from', userId, 'stream:', event.streams[0].id);
+    const stream = event.streams[0];
+    const streamId = stream.id;
+    
+    // Her stream için benzersiz ID oluştur
+    const videoId = `${userId}-${streamId}`;
+    
+    // Stream'in video track'i varsa ekran paylaşımı olabilir
+    const hasVideo = stream.getVideoTracks().length > 0;
+    const label = hasVideo ? `${userName} - Video` : userName;
+    
+    addVideoStream(videoId, stream, label);
     // Ses seviyesi takibi ekle
-    detectAudioLevel(userId, event.streams[0]);
+    detectAudioLevel(videoId, stream);
   };
   
   peer.onicecandidate = (event) => {
@@ -440,24 +454,19 @@ shareBtn.addEventListener('click', async () => {
       screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
       const screenTrack = screenStream.getVideoTracks()[0];
       
-      // Her peer için ekran track'ini ekle veya değiştir
+      // Her peer için ekran track'ini YENİ TRACK olarak ekle
       for (const [userId, peer] of Object.entries(peers)) {
-        const sender = peer.getSenders().find(s => s.track?.kind === 'video');
-        if (sender) {
-          await sender.replaceTrack(screenTrack);
-        } else {
-          peer.addTrack(screenTrack, screenStream);
-          // Yeni track eklendiğinde renegotiation gerekli
-          const offer = await peer.createOffer();
-          await peer.setLocalDescription(offer);
-          socket.emit('offer', offer, roomId, userId);
-        }
+        peer.addTrack(screenTrack, screenStream);
+        // Yeni track eklendiğinde renegotiation gerekli
+        const offer = await peer.createOffer();
+        await peer.setLocalDescription(offer);
+        socket.emit('offer', offer, roomId, userId);
       }
       
-      addVideoStream('screen', screenStream, userName + ' - Ekran Paylaşımı');
+      addVideoStream('local-screen', screenStream, userName + ' (Sen) - Ekran Paylaşımı');
       
       // Ekran paylaşımı için de ses algılama (eğer audio varsa)
-      detectAudioLevel('screen', screenStream);
+      detectAudioLevel('local-screen', screenStream);
       
       screenTrack.onended = () => {
         stopScreenShare();
@@ -475,23 +484,21 @@ shareBtn.addEventListener('click', async () => {
 async function stopScreenShare() {
   if (screenStream) {
     screenStream.getTracks().forEach(track => track.stop());
-    removeVideoStream('screen');
+    removeVideoStream('local-screen');
     
-    // Ekran paylaşımı durdurulduğunda kameraya geri dön veya video track'i kaldır
+    // Ekran paylaşımı track'lerini peer'lardan kaldır
     for (const [userId, peer] of Object.entries(peers)) {
-      const sender = peer.getSenders().find(s => s.track?.kind === 'video');
-      if (sender) {
-        if (isVideoEnabled && localStream.getVideoTracks().length > 0) {
-          const videoTrack = localStream.getVideoTracks()[0];
-          await sender.replaceTrack(videoTrack);
-        } else {
+      const senders = peer.getSenders();
+      // Ekran track'ini bul ve kaldır
+      for (const sender of senders) {
+        if (sender.track && screenStream.getTracks().includes(sender.track)) {
           peer.removeTrack(sender);
-          // Track kaldırıldığında renegotiation gerekli
-          const offer = await peer.createOffer();
-          await peer.setLocalDescription(offer);
-          socket.emit('offer', offer, roomId, userId);
         }
       }
+      // Renegotiation
+      const offer = await peer.createOffer();
+      await peer.setLocalDescription(offer);
+      socket.emit('offer', offer, roomId, userId);
     }
     
     screenStream = null;
