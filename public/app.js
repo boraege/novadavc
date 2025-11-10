@@ -92,26 +92,47 @@ socket.on('user-disconnected', (userId) => {
 });
 
 socket.on('offer', async (offer, userId) => {
-  const peer = peers[userId];
-  if (peer) {
+  console.log('Offer alındı:', userId);
+  let peer = peers[userId];
+  
+  // Peer yoksa oluştur
+  if (!peer) {
+    console.log('Peer bulunamadı, oluşturuluyor:', userId);
+    peer = await createPeerConnection(userId, false, 'Kullanıcı');
+  }
+  
+  try {
     await peer.setRemoteDescription(new RTCSessionDescription(offer));
     const answer = await peer.createAnswer();
     await peer.setLocalDescription(answer);
+    console.log('Answer gönderiliyor:', userId);
     socket.emit('answer', answer, roomId, userId);
+  } catch (err) {
+    console.error('Offer işleme hatası:', err);
   }
 });
 
 socket.on('answer', async (answer, userId) => {
+  console.log('Answer alındı:', userId);
   const peer = peers[userId];
   if (peer) {
-    await peer.setRemoteDescription(new RTCSessionDescription(answer));
+    try {
+      await peer.setRemoteDescription(new RTCSessionDescription(answer));
+      console.log('Answer işlendi:', userId);
+    } catch (err) {
+      console.error('Answer işleme hatası:', err);
+    }
   }
 });
 
 socket.on('ice-candidate', async (candidate, userId) => {
   const peer = peers[userId];
   if (peer && candidate) {
-    await peer.addIceCandidate(new RTCIceCandidate(candidate));
+    try {
+      await peer.addIceCandidate(new RTCIceCandidate(candidate));
+    } catch (err) {
+      console.error('ICE candidate hatası:', err);
+    }
   }
 });
 
@@ -120,9 +141,22 @@ socket.on('chat-message', (message, senderName) => {
 });
 
 // WebRTC Functions
-function createPeerConnection(userId, isInitiator, userName) {
+async function createPeerConnection(userId, isInitiator, userName) {
   const peer = new RTCPeerConnection(config);
   peers[userId] = peer;
+  
+  peer.ontrack = (event) => {
+    console.log('Track alındı:', event.track.kind, 'from', userId);
+    addVideoStream(userId, event.streams[0], userName);
+    // Ses seviyesi takibi ekle
+    detectAudioLevel(userId, event.streams[0]);
+  };
+  
+  peer.onicecandidate = (event) => {
+    if (event.candidate) {
+      socket.emit('ice-candidate', event.candidate, roomId, userId);
+    }
+  };
   
   // Tüm aktif track'leri ekle
   localStream.getTracks().forEach(track => {
@@ -138,37 +172,16 @@ function createPeerConnection(userId, isInitiator, userName) {
     });
   }
   
-  peer.ontrack = (event) => {
-    console.log('Track alındı:', event.track.kind, 'from', userId);
-    addVideoStream(userId, event.streams[0], userName);
-    // Ses seviyesi takibi ekle
-    detectAudioLevel(userId, event.streams[0]);
-  };
-  
-  peer.onicecandidate = (event) => {
-    if (event.candidate) {
-      socket.emit('ice-candidate', event.candidate, roomId, userId);
-    }
-  };
-  
-  peer.onnegotiationneeded = async () => {
-    if (isInitiator) {
-      try {
-        const offer = await peer.createOffer();
-        await peer.setLocalDescription(offer);
-        socket.emit('offer', peer.localDescription, roomId, userId);
-      } catch (err) {
-        console.error('Negotiation hatası:', err);
-      }
-    }
-  };
-  
+  // Initiator ise hemen offer gönder
   if (isInitiator) {
-    peer.createOffer()
-      .then(offer => peer.setLocalDescription(offer))
-      .then(() => {
-        socket.emit('offer', peer.localDescription, roomId, userId);
-      });
+    try {
+      const offer = await peer.createOffer();
+      await peer.setLocalDescription(offer);
+      console.log('Offer gönderiliyor:', userId);
+      socket.emit('offer', peer.localDescription, roomId, userId);
+    } catch (err) {
+      console.error('Offer oluşturma hatası:', err);
+    }
   }
   
   return peer;
