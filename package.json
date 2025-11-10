@@ -1,0 +1,19 @@
+{
+  "name": "novadavc",
+  "version": "1.0.0",
+  "description": "Novada - Modern sesli sohbet ve ekran paylaşım platformu",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": ["novada", "webrtc", "voice-chat", "screen-share", "video-conference"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.6.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

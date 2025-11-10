@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Novada - Sesli Sohbet Platformu</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <meta name="description" content="Novada - Modern sesli sohbet ve ekran paylaşım platformu">
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="logo">NOVADA</div>
+            <div class="room-info">
+                <div id="roomName">Oda: -</div>
+                <div id="userName">Kullanıcı: -</div>
+            </div>
+            <div class="users-list">
+                <h3>Aktif Kullanıcılar</h3>
+                <div id="usersList"></div>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div id="loginScreen" class="login-screen">
+                <div class="login-box">
+                    <h1>✦ NOVADA</h1>
+                    <input type="text" id="userNameInput" placeholder="Adınızı girin" maxlength="20">
+                    <input type="text" id="roomIdInput" placeholder="Oda ID (örn: toplanti-123)" maxlength="20">
+                    <button id="joinBtn">Odaya Katıl</button>
+                    <p class="info">Aynı oda ID'sini kullanan arkadaşlarınızla anında bağlanın ve sesli sohbet edin</p>
+                </div>
+            </div>
+
+            <div id="chatScreen" class="chat-screen" style="display: none;">
+                <div class="video-grid" id="videoGrid"></div>
+                
+                <div class="controls">
+                    <button id="muteBtn" class="control-btn active" title="Mikrofonu Kapat/Aç">
+                        🎤
+                    </button>
+                    <button id="videoBtn" class="control-btn" title="Kamerayı Kapat/Aç">
+                        📹
+                    </button>
+                    <button id="shareBtn" class="control-btn" title="Ekran Paylaş">
+                        🖥️
+                    </button>
+                    <button id="leaveBtn" class="control-btn leave" title="Ayrıl">
+                        📞
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
