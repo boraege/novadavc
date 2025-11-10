@@ -191,33 +191,44 @@ function addVideoStream(id, stream, label) {
 
 // Ses seviyesi algılama fonksiyonu
 function detectAudioLevel(id, stream) {
-  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  const analyser = audioContext.createAnalyser();
-  const microphone = audioContext.createMediaStreamSource(stream);
-  const dataArray = new Uint8Array(analyser.frequencyBinCount);
-  
-  analyser.smoothingTimeConstant = 0.8;
-  analyser.fftSize = 512;
-  
-  microphone.connect(analyser);
-  
-  function checkAudioLevel() {
-    analyser.getByteFrequencyData(dataArray);
-    const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-    
-    const container = document.getElementById(`video-${id}`);
-    if (container) {
-      // Ses seviyesi eşik değerini aşarsa yeşil efekt ekle
-      if (average > 20) {
-        container.classList.add('speaking');
-      } else {
-        container.classList.remove('speaking');
-      }
-      requestAnimationFrame(checkAudioLevel);
-    }
+  // Audio track yoksa ses algılama yapma
+  const audioTracks = stream.getAudioTracks();
+  if (audioTracks.length === 0) {
+    console.log('Audio track bulunamadı:', id);
+    return;
   }
   
-  checkAudioLevel();
+  try {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const analyser = audioContext.createAnalyser();
+    const microphone = audioContext.createMediaStreamSource(stream);
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    
+    analyser.smoothingTimeConstant = 0.8;
+    analyser.fftSize = 512;
+    
+    microphone.connect(analyser);
+    
+    function checkAudioLevel() {
+      analyser.getByteFrequencyData(dataArray);
+      const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+      
+      const container = document.getElementById(`video-${id}`);
+      if (container) {
+        // Ses seviyesi eşik değerini aşarsa yeşil efekt ekle
+        if (average > 15) {
+          container.classList.add('speaking');
+        } else {
+          container.classList.remove('speaking');
+        }
+        requestAnimationFrame(checkAudioLevel);
+      }
+    }
+    
+    checkAudioLevel();
+  } catch (err) {
+    console.error('Ses algılama hatası:', id, err);
+  }
 }
 
 function toggleFullscreen(element) {
@@ -349,6 +360,9 @@ shareBtn.addEventListener('click', async () => {
       }
       
       addVideoStream('screen', screenStream, userName + ' - Ekran Paylaşımı');
+      
+      // Ekran paylaşımı için de ses algılama (eğer audio varsa)
+      detectAudioLevel('screen', screenStream);
       
       screenTrack.onended = () => {
         stopScreenShare();
