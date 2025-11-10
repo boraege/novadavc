@@ -68,16 +68,19 @@ joinBtn.addEventListener('click', async () => {
 });
 
 // Socket Events
-socket.on('room-users', (users) => {
-  users.forEach(user => {
-    createPeerConnection(user.id, true, user.name);
-  });
+socket.on('room-users', async (users) => {
+  console.log('Odadaki mevcut kullanıcılar:', users);
+  // Odaya yeni girdiğimizde, mevcut kullanıcılardan offer bekleriz (isInitiator=false)
+  for (const user of users) {
+    await createPeerConnection(user.id, false, user.name);
+  }
   updateUsersList(users);
 });
 
-socket.on('user-connected', (userId, userName) => {
-  console.log('Kullanıcı bağlandı:', userName);
-  createPeerConnection(userId, false, userName);
+socket.on('user-connected', async (userId, userName) => {
+  console.log('Yeni kullanıcı bağlandı:', userName, userId);
+  // Yeni kullanıcı geldiğinde BIZ offer göndeririz (isInitiator=true)
+  await createPeerConnection(userId, true, userName);
   updateUsersList();
 });
 
@@ -159,17 +162,21 @@ async function createPeerConnection(userId, isInitiator, userName) {
   };
   
   // Tüm aktif track'leri ekle
+  console.log('LocalStream tracks:', localStream.getTracks().length);
   localStream.getTracks().forEach(track => {
-    console.log('Track ekleniyor:', track.kind, track.enabled);
+    console.log('Track ekleniyor:', track.kind, track.enabled, track.id);
     peer.addTrack(track, localStream);
   });
   
   // Eğer ekran paylaşımı aktifse, ekran track'ini de ekle
   if (screenStream) {
+    console.log('ScreenStream tracks:', screenStream.getTracks().length);
     screenStream.getTracks().forEach(track => {
-      console.log('Ekran track ekleniyor:', track.kind);
+      console.log('Ekran track ekleniyor:', track.kind, track.id);
       peer.addTrack(track, screenStream);
     });
+  } else {
+    console.log('Ekran paylaşımı yok');
   }
   
   // Initiator ise hemen offer gönder
