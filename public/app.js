@@ -239,21 +239,57 @@ function detectAudioLevel(id, stream) {
 }
 
 function toggleFullscreen(element) {
-  if (!document.fullscreenElement) {
-    element.requestFullscreen().catch(err => {
-      console.error('Tam ekran hatası:', err);
-    });
+  const isFullscreen = document.fullscreenElement || 
+                       document.webkitFullscreenElement || 
+                       document.mozFullScreenElement || 
+                       document.msFullscreenElement;
+  
+  if (!isFullscreen) {
+    // Farklı tarayıcılar için tam ekran API'leri
+    if (element.requestFullscreen) {
+      element.requestFullscreen().catch(err => {
+        console.error('Tam ekran hatası:', err);
+      });
+    } else if (element.webkitRequestFullscreen) {
+      element.webkitRequestFullscreen();
+    } else if (element.webkitEnterFullscreen) {
+      // iOS Safari için video elementi
+      const video = element.querySelector('video');
+      if (video && video.webkitEnterFullscreen) {
+        video.webkitEnterFullscreen();
+      }
+    } else if (element.mozRequestFullScreen) {
+      element.mozRequestFullScreen();
+    } else if (element.msRequestFullscreen) {
+      element.msRequestFullscreen();
+    }
   } else {
-    document.exitFullscreen();
+    // Tam ekrandan çık
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    } else if (document.mozCancelFullScreen) {
+      document.mozCancelFullScreen();
+    } else if (document.msExitFullscreen) {
+      document.msExitFullscreen();
+    }
   }
 }
 
-// Tam ekran değişikliklerini dinle ve buton ikonunu güncelle
-document.addEventListener('fullscreenchange', () => {
-  const fullscreenBtns = document.querySelectorAll('.fullscreen-btn');
-  fullscreenBtns.forEach(btn => {
-    btn.innerHTML = document.fullscreenElement ? '⛶' : '⛶';
-    btn.title = document.fullscreenElement ? 'Tam Ekrandan Çık' : 'Tam Ekran';
+// Tam ekran değişikliklerini dinle (tüm tarayıcılar için)
+['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'msfullscreenchange'].forEach(event => {
+  document.addEventListener(event, () => {
+    const isFullscreen = document.fullscreenElement || 
+                         document.webkitFullscreenElement || 
+                         document.mozFullScreenElement || 
+                         document.msFullscreenElement;
+    
+    const fullscreenBtns = document.querySelectorAll('.fullscreen-btn');
+    fullscreenBtns.forEach(btn => {
+      btn.innerHTML = isFullscreen ? '⛶' : '⛶';
+      btn.title = isFullscreen ? 'Tam Ekrandan Çık' : 'Tam Ekran';
+    });
   });
 });
 

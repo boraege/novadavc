@@ -390,15 +390,28 @@ body {
     transform: scale(0.95);
 }
 
-.video-container:fullscreen {
+.video-container:fullscreen,
+.video-container:-webkit-full-screen,
+.video-container:-moz-full-screen,
+.video-container:-ms-fullscreen {
     aspect-ratio: auto;
+    width: 100vw;
+    height: 100vh;
 }
 
-.video-container:fullscreen video {
+.video-container:fullscreen video,
+.video-container:-webkit-full-screen video,
+.video-container:-moz-full-screen video,
+.video-container:-ms-fullscreen video {
     object-fit: contain;
+    width: 100%;
+    height: 100%;
 }
 
-.video-container:fullscreen .fullscreen-btn {
+.video-container:fullscreen .fullscreen-btn,
+.video-container:-webkit-full-screen .fullscreen-btn,
+.video-container:-moz-full-screen .fullscreen-btn,
+.video-container:-ms-fullscreen .fullscreen-btn {
     opacity: 1;
 }
 
