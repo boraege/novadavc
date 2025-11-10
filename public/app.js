@@ -196,12 +196,17 @@ videoBtn.addEventListener('click', async () => {
       
       localStream.addTrack(videoTrack);
       
-      Object.values(peers).forEach(peer => {
+      // Her peer'a video track'i ekle ve renegotiation yap
+      for (const [userId, peer] of Object.entries(peers)) {
         const sender = peer.getSenders().find(s => s.track?.kind === 'video');
         if (!sender) {
           peer.addTrack(videoTrack, localStream);
+          // Yeni track eklendiğinde renegotiation gerekli
+          const offer = await peer.createOffer();
+          await peer.setLocalDescription(offer);
+          socket.emit('offer', offer, roomId, userId);
         }
-      });
+      }
       
       const localVideo = document.querySelector('#video-local video');
       if (localVideo) localVideo.srcObject = localStream;
@@ -219,10 +224,17 @@ videoBtn.addEventListener('click', async () => {
       localStream.removeTrack(track);
     });
     
-    Object.values(peers).forEach(peer => {
+    // Video track'lerini peer'lardan kaldır
+    for (const [userId, peer] of Object.entries(peers)) {
       const sender = peer.getSenders().find(s => s.track?.kind === 'video');
-      if (sender) peer.removeTrack(sender);
-    });
+      if (sender) {
+        peer.removeTrack(sender);
+        // Track kaldırıldığında renegotiation gerekli
+        const offer = await peer.createOffer();
+        await peer.setLocalDescription(offer);
+        socket.emit('offer', offer, roomId, userId);
+      }
+    }
     
     isVideoEnabled = false;
     videoBtn.textContent = '📹';
@@ -236,14 +248,19 @@ shareBtn.addEventListener('click', async () => {
       screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
       const screenTrack = screenStream.getVideoTracks()[0];
       
-      Object.values(peers).forEach(peer => {
+      // Her peer için ekran track'ini ekle veya değiştir
+      for (const [userId, peer] of Object.entries(peers)) {
         const sender = peer.getSenders().find(s => s.track?.kind === 'video');
         if (sender) {
-          sender.replaceTrack(screenTrack);
+          await sender.replaceTrack(screenTrack);
         } else {
           peer.addTrack(screenTrack, screenStream);
+          // Yeni track eklendiğinde renegotiation gerekli
+          const offer = await peer.createOffer();
+          await peer.setLocalDescription(offer);
+          socket.emit('offer', offer, roomId, userId);
         }
-      });
+      }
       
       addVideoStream('screen', screenStream, userName + ' - Ekran Paylaşımı');
       
@@ -260,17 +277,26 @@ shareBtn.addEventListener('click', async () => {
   }
 });
 
-function stopScreenShare() {
+async function stopScreenShare() {
   if (screenStream) {
     screenStream.getTracks().forEach(track => track.stop());
     removeVideoStream('screen');
     
-    if (isVideoEnabled && localStream.getVideoTracks().length > 0) {
-      const videoTrack = localStream.getVideoTracks()[0];
-      Object.values(peers).forEach(peer => {
-        const sender = peer.getSenders().find(s => s.track?.kind === 'video');
-        if (sender) sender.replaceTrack(videoTrack);
-      });
+    // Ekran paylaşımı durdurulduğunda kameraya geri dön veya video track'i kaldır
+    for (const [userId, peer] of Object.entries(peers)) {
+      const sender = peer.getSenders().find(s => s.track?.kind === 'video');
+      if (sender) {
+        if (isVideoEnabled && localStream.getVideoTracks().length > 0) {
+          const videoTrack = localStream.getVideoTracks()[0];
+          await sender.replaceTrack(videoTrack);
+        } else {
+          peer.removeTrack(sender);
+          // Track kaldırıldığında renegotiation gerekli
+          const offer = await peer.createOffer();
+          await peer.setLocalDescription(offer);
+          socket.emit('offer', offer, roomId, userId);
+        }
+      }
     }
     
     screenStream = null;
