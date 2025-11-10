@@ -27,6 +27,9 @@ const shareBtn = document.getElementById('shareBtn');
 const leaveBtn = document.getElementById('leaveBtn');
 const videoGrid = document.getElementById('videoGrid');
 const usersList = document.getElementById('usersList');
+const chatMessages = document.getElementById('chatMessages');
+const chatInput = document.getElementById('chatInput');
+const sendBtn = document.getElementById('sendBtn');
 
 // Join Room
 joinBtn.addEventListener('click', async () => {
@@ -110,6 +113,10 @@ socket.on('ice-candidate', async (candidate, userId) => {
   if (peer && candidate) {
     await peer.addIceCandidate(new RTCIceCandidate(candidate));
   }
+});
+
+socket.on('chat-message', (message, senderName) => {
+  addChatMessage(message, senderName, false);
 });
 
 // WebRTC Functions
@@ -413,4 +420,41 @@ leaveBtn.addEventListener('click', () => {
   
   socket.disconnect();
   location.reload();
+});
+
+// Chat Functions
+function addChatMessage(message, author, isOwn = false) {
+  const messageDiv = document.createElement('div');
+  messageDiv.className = `chat-message ${isOwn ? 'own-message' : ''}`;
+  
+  const authorDiv = document.createElement('div');
+  authorDiv.className = 'message-author';
+  authorDiv.textContent = author;
+  
+  const textDiv = document.createElement('div');
+  textDiv.className = 'message-text';
+  textDiv.textContent = message;
+  
+  messageDiv.appendChild(authorDiv);
+  messageDiv.appendChild(textDiv);
+  chatMessages.appendChild(messageDiv);
+  
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function sendMessage() {
+  const message = chatInput.value.trim();
+  if (message && roomId) {
+    socket.emit('chat-message', message, roomId, userName);
+    addChatMessage(message, userName + ' (Sen)', true);
+    chatInput.value = '';
+  }
+}
+
+sendBtn.addEventListener('click', sendMessage);
+
+chatInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    sendMessage();
+  }
 });

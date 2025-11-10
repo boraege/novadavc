@@ -38,6 +38,10 @@ io.on('connection', (socket) => {
     socket.to(targetId).emit('ice-candidate', candidate, socket.id);
   });
 
+  socket.on('chat-message', (message, roomId, senderName) => {
+    socket.to(roomId).emit('chat-message', message, senderName);
+  });
+
   socket.on('disconnect', () => {
     console.log('Kullanıcı ayrıldı:', socket.id);
     
