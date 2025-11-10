@@ -124,11 +124,22 @@ function createPeerConnection(userId, isInitiator, userName) {
   const peer = new RTCPeerConnection(config);
   peers[userId] = peer;
   
+  // Tüm aktif track'leri ekle
   localStream.getTracks().forEach(track => {
+    console.log('Track ekleniyor:', track.kind, track.enabled);
     peer.addTrack(track, localStream);
   });
   
+  // Eğer ekran paylaşımı aktifse, ekran track'ini de ekle
+  if (screenStream) {
+    screenStream.getTracks().forEach(track => {
+      console.log('Ekran track ekleniyor:', track.kind);
+      peer.addTrack(track, screenStream);
+    });
+  }
+  
   peer.ontrack = (event) => {
+    console.log('Track alındı:', event.track.kind, 'from', userId);
     addVideoStream(userId, event.streams[0], userName);
     // Ses seviyesi takibi ekle
     detectAudioLevel(userId, event.streams[0]);
@@ -137,6 +148,18 @@ function createPeerConnection(userId, isInitiator, userName) {
   peer.onicecandidate = (event) => {
     if (event.candidate) {
       socket.emit('ice-candidate', event.candidate, roomId, userId);
+    }
+  };
+  
+  peer.onnegotiationneeded = async () => {
+    if (isInitiator) {
+      try {
+        const offer = await peer.createOffer();
+        await peer.setLocalDescription(offer);
+        socket.emit('offer', peer.localDescription, roomId, userId);
+      } catch (err) {
+        console.error('Negotiation hatası:', err);
+      }
     }
   };
   
@@ -182,7 +205,7 @@ function addVideoStream(id, stream, label) {
   fullscreenBtn.title = 'Tam Ekran';
   fullscreenBtn.onclick = (e) => {
     e.stopPropagation();
-    toggleFullscreen(container);
+    toggleFullscreen(container, video);
   };
   
   container.appendChild(fullscreenBtn);
@@ -238,30 +261,37 @@ function detectAudioLevel(id, stream) {
   }
 }
 
-function toggleFullscreen(element) {
+function toggleFullscreen(container, video) {
   const isFullscreen = document.fullscreenElement || 
                        document.webkitFullscreenElement || 
                        document.mozFullScreenElement || 
                        document.msFullscreenElement;
   
   if (!isFullscreen) {
-    // Farklı tarayıcılar için tam ekran API'leri
-    if (element.requestFullscreen) {
-      element.requestFullscreen().catch(err => {
+    // Safari iOS için önce video elementini dene
+    if (video && video.webkitEnterFullscreen) {
+      try {
+        video.webkitEnterFullscreen();
+        return;
+      } catch (err) {
+        console.log('Video tam ekran başarısız, container deneniyor');
+      }
+    }
+    
+    // Container için tam ekran API'leri
+    if (container.requestFullscreen) {
+      container.requestFullscreen().catch(err => {
         console.error('Tam ekran hatası:', err);
       });
-    } else if (element.webkitRequestFullscreen) {
-      element.webkitRequestFullscreen();
-    } else if (element.webkitEnterFullscreen) {
-      // iOS Safari için video elementi
-      const video = element.querySelector('video');
-      if (video && video.webkitEnterFullscreen) {
-        video.webkitEnterFullscreen();
-      }
-    } else if (element.mozRequestFullScreen) {
-      element.mozRequestFullScreen();
-    } else if (element.msRequestFullscreen) {
-      element.msRequestFullscreen();
+    } else if (container.webkitRequestFullscreen) {
+      container.webkitRequestFullscreen();
+    } else if (container.webkitRequestFullScreen) {
+      // Büyük S ile de dene (eski Safari)
+      container.webkitRequestFullScreen();
+    } else if (container.mozRequestFullScreen) {
+      container.mozRequestFullScreen();
+    } else if (container.msRequestFullscreen) {
+      container.msRequestFullscreen();
     }
   } else {
     // Tam ekrandan çık
@@ -269,6 +299,8 @@ function toggleFullscreen(element) {
       document.exitFullscreen();
     } else if (document.webkitExitFullscreen) {
       document.webkitExitFullscreen();
+    } else if (document.webkitCancelFullScreen) {
+      document.webkitCancelFullScreen();
     } else if (document.mozCancelFullScreen) {
       document.mozCancelFullScreen();
     } else if (document.msExitFullscreen) {
