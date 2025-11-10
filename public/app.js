@@ -123,6 +123,8 @@ function createPeerConnection(userId, isInitiator, userName) {
   
   peer.ontrack = (event) => {
     addVideoStream(userId, event.streams[0], userName);
+    // Ses seviyesi takibi ekle
+    detectAudioLevel(userId, event.streams[0]);
   };
   
   peer.onicecandidate = (event) => {
@@ -166,19 +168,56 @@ function addVideoStream(id, stream, label) {
   labelDiv.className = 'video-label';
   labelDiv.textContent = label;
   
-  // Tam ekran butonu ekle (sadece ekran paylaşımı için)
-  if (id === 'screen' || id !== 'local') {
-    const fullscreenBtn = document.createElement('button');
-    fullscreenBtn.className = 'fullscreen-btn';
-    fullscreenBtn.innerHTML = '⛶';
-    fullscreenBtn.title = 'Tam Ekran';
-    fullscreenBtn.onclick = () => toggleFullscreen(container);
-    container.appendChild(fullscreenBtn);
-  }
+  // Tam ekran butonu ekle (tüm videolar için)
+  const fullscreenBtn = document.createElement('button');
+  fullscreenBtn.className = 'fullscreen-btn';
+  fullscreenBtn.innerHTML = '⛶';
+  fullscreenBtn.title = 'Tam Ekran';
+  fullscreenBtn.onclick = (e) => {
+    e.stopPropagation();
+    toggleFullscreen(container);
+  };
   
+  container.appendChild(fullscreenBtn);
   container.appendChild(video);
   container.appendChild(labelDiv);
   videoGrid.appendChild(container);
+  
+  // Local stream için de ses seviyesi takibi
+  if (id === 'local') {
+    detectAudioLevel(id, stream);
+  }
+}
+
+// Ses seviyesi algılama fonksiyonu
+function detectAudioLevel(id, stream) {
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  const analyser = audioContext.createAnalyser();
+  const microphone = audioContext.createMediaStreamSource(stream);
+  const dataArray = new Uint8Array(analyser.frequencyBinCount);
+  
+  analyser.smoothingTimeConstant = 0.8;
+  analyser.fftSize = 512;
+  
+  microphone.connect(analyser);
+  
+  function checkAudioLevel() {
+    analyser.getByteFrequencyData(dataArray);
+    const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+    
+    const container = document.getElementById(`video-${id}`);
+    if (container) {
+      // Ses seviyesi eşik değerini aşarsa yeşil efekt ekle
+      if (average > 20) {
+        container.classList.add('speaking');
+      } else {
+        container.classList.remove('speaking');
+      }
+      requestAnimationFrame(checkAudioLevel);
+    }
+  }
+  
+  checkAudioLevel();
 }
 
 function toggleFullscreen(element) {
