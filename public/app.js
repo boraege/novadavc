@@ -40,7 +40,12 @@ joinBtn.addEventListener('click', async () => {
   
   try {
     localStream = await navigator.mediaDevices.getUserMedia({ 
-      audio: true, 
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 48000
+      }, 
       video: false 
     });
     
@@ -148,16 +153,52 @@ function addVideoStream(id, stream, label) {
   video.srcObject = stream;
   video.autoplay = true;
   video.playsInline = true;
-  if (id === 'local') video.muted = true;
+  
+  // Kendi sesimizi duymamak için local video her zaman muted
+  if (id === 'local') {
+    video.muted = true;
+  } else {
+    // Diğer kullanıcıların sesi için yankı önleme
+    video.volume = 1.0;
+  }
   
   const labelDiv = document.createElement('div');
   labelDiv.className = 'video-label';
   labelDiv.textContent = label;
   
+  // Tam ekran butonu ekle (sadece ekran paylaşımı için)
+  if (id === 'screen' || id !== 'local') {
+    const fullscreenBtn = document.createElement('button');
+    fullscreenBtn.className = 'fullscreen-btn';
+    fullscreenBtn.innerHTML = '⛶';
+    fullscreenBtn.title = 'Tam Ekran';
+    fullscreenBtn.onclick = () => toggleFullscreen(container);
+    container.appendChild(fullscreenBtn);
+  }
+  
   container.appendChild(video);
   container.appendChild(labelDiv);
   videoGrid.appendChild(container);
 }
+
+function toggleFullscreen(element) {
+  if (!document.fullscreenElement) {
+    element.requestFullscreen().catch(err => {
+      console.error('Tam ekran hatası:', err);
+    });
+  } else {
+    document.exitFullscreen();
+  }
+}
+
+// Tam ekran değişikliklerini dinle ve buton ikonunu güncelle
+document.addEventListener('fullscreenchange', () => {
+  const fullscreenBtns = document.querySelectorAll('.fullscreen-btn');
+  fullscreenBtns.forEach(btn => {
+    btn.innerHTML = document.fullscreenElement ? '⛶' : '⛶';
+    btn.title = document.fullscreenElement ? 'Tam Ekrandan Çık' : 'Tam Ekran';
+  });
+});
 
 function removeVideoStream(id) {
   const container = document.getElementById(`video-${id}`);
@@ -191,7 +232,13 @@ muteBtn.addEventListener('click', () => {
 videoBtn.addEventListener('click', async () => {
   if (!isVideoEnabled) {
     try {
-      const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const videoStream = await navigator.mediaDevices.getUserMedia({ 
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user'
+        }
+      });
       const videoTrack = videoStream.getVideoTracks()[0];
       
       localStream.addTrack(videoTrack);
